@@ -1,0 +1,30 @@
+# Virtual environment
+.venv
+
+# Environment variable files
+.env
+
+# Editor config folders/files
+.vscode/
+.idea/
+
+# Generated files and folders
+*.pyc
+*.log
+__pycache__/
+.DS_Store
+db.sqlite3
+
+# Unit test / Coverage analysis report
+.coverage
+htmlcov/
+test-results/
+
+# mypy
+.mypy_cache/
+
+
+build/
+dist/
+*.egg-info
+abi.py

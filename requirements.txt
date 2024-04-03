@@ -1,0 +1,13 @@
+python-decouple==3.8
+boto3==1.28.62
+ic-py==1.0.1
+django==4.2.5
+pre-commit==3.4.0
+flake8-isort==6.1.0
+flake8==6.1.0
+black==23.9.1
+flake8-pep3101==2.0.0
+flake8-comprehensions==3.14.0
+flake8-builtins==2.1.0
+flake8-blind-except==0.2.1
+pycryptodome==3.19.0
