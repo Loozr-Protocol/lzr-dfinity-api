@@ -127,6 +127,10 @@ type GetTransactionsRequest =
    length: nat;
    start: TxIndex;
  };
+type Factory = 
+ service {
+   new_token: (text, text) -> (Token);
+ };
 type BurnArgs = 
  record {
    amount: Balance;
@@ -159,4 +163,4 @@ type Account =
    owner: principal;
    subaccount: opt Subaccount;
  };
-service : (text, text) -> Token
+service : () -> Factory

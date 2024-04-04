@@ -121,3 +121,24 @@ class CreatorTokenCanister(TokenCanister):
         res = self.canister.icrc1_transfer(amount=amount)
         print("Helloooo:::: ", res)
         # return res[0]
+
+
+class FactoryCanister(BaseCanister):
+    def __init__(
+        self,
+        identity: Identity,
+        canister_id: str,
+        client=None,
+        candid_name="factory_backend",
+    ):
+        super().__init__(
+            identity=identity,
+            candid_name=candid_name,
+            canister_id=canister_id,
+            client=client,
+        )
+
+    def new_token(self, name: str, symbol: str):
+        res = self.canister.new_token(name, symbol)
+        return res[0]
+
