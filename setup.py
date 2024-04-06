@@ -8,7 +8,7 @@ def read(f):
 
 setup(
     name="lzr-dfinityapi",
-    version="0.1.2",
+    version="0.1.3",
     url="https://github.com/your-name/your_library",
     license="MIT",
     author="Confidence Yobo",
