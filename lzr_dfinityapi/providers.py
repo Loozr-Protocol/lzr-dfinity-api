@@ -5,12 +5,14 @@ from ic.agent import Agent
 from ic.identity import Identity
 from ic.canister import Canister
 
+from .config import CANDID_FOLDER
+
 
 class CanisterProvider:
     def __init__(self, agent: Agent):
         self._agent = agent
 
-    def load_did(self, candid_name, abi_folder="lzr_dfinityapi/candids"):
+    def load_did(self, candid_name, abi_folder=CANDID_FOLDER):
         abi_path = os.path.join(abi_folder, f"{candid_name}.did")
         return open(abi_path, "r").read()
 
@@ -138,6 +140,6 @@ class FactoryCanister(BaseCanister):
             client=client,
         )
 
-    def new_token(self, name: str, symbol: str) -> str:
+    def new_token(self, name: str, symbol: str):
         res = self.canister.new_token(name, symbol)
-        return res[0]
+        return res

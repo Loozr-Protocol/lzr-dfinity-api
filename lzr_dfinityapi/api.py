@@ -6,10 +6,12 @@ from ic import Identity
 from ic.client import Client
 from web3 import Web3
 from web3.types import Wei
+from ic.agent import Agent
+from ic.candid import encode, Types
 
-from .providers import CreatorTokenCanister, FactoryCanister
+from .providers import CreatorTokenCanister
 from .models import BOUGHT, SOLD, Coin, Log, Holder
-from .config import RPC_URL, CHAIN_ENV, FACTORY_CANISTERS, ORACLE_IDENTITY
+from .config import RPC_URL, FACTORY_CANISTER, ORACLE_IDENTITY
 
 
 class ContinuosToken:
@@ -92,22 +94,28 @@ def create_coin(user, symbol: str, name: str) -> Coin:
         coin = Coin.objects.create(name=name, symbol=symbol, creator=user)
 
         client = Client(url=RPC_URL)
-        factory_canister_id = FACTORY_CANISTERS[CHAIN_ENV]
+        factory_canister_id = FACTORY_CANISTER
         oracle_id = Identity(privkey=ORACLE_IDENTITY)
-        factory_canister = FactoryCanister(
-            identity=oracle_id, client=client, canister_id=factory_canister_id
-        )
-        result = factory_canister.new_token(name, symbol)
+        agent = Agent(identity=oracle_id, client=client)
 
-        coin.canister_id = result
+        params = [
+            {'type': Types.Text, 'value': name},
+            {'type': Types.Text, 'value': symbol}
+        ]
+        result = agent.update_raw(factory_canister_id, "new_token", encode(params))
+
+        coin.canister_id = result[0]['value']
         coin.save()
 
         return coin
 
 
 def buy_coin(user, coin: Coin, lzr_amount: Union[int, float]):
+    coin_reserve_balance = Web3.from_wei(coin.reserve_balance, 'ether')
+    coin_total_supply = Web3.from_wei(coin.total_supply, 'ether')
+
     mint_amount = ContinuosToken.calc_purchase_return(
-        coin.total_supply, coin.reserve_balance, lzr_amount
+        coin_total_supply, coin_reserve_balance, lzr_amount
     )
     client = Client(url=RPC_URL)
     canister_id = coin.canister_id
@@ -116,7 +124,7 @@ def buy_coin(user, coin: Coin, lzr_amount: Union[int, float]):
         identity=oracle_id, client=client, canister_id=canister_id
     )
 
-    mint_amount_wei = Web3.to_wei(mint_amount)
+    mint_amount_wei = Web3.to_wei(mint_amount, 'ether')
     user_principal = user.account_principal
 
     coin_canister.mint(mint_amount_wei, user_principal)
@@ -134,10 +142,13 @@ def buy_coin(user, coin: Coin, lzr_amount: Union[int, float]):
 
 
 def sell_coin(user, user_identity: Identity, coin: Coin, coin_amount: Union[int, float]) -> Wei:
+    coin_reserve_balance = Web3.from_wei(coin.reserve_balance, 'ether')
+    coin_total_supply = Web3.from_wei(coin.total_supply, 'ether')
+
     burn_amount = ContinuosToken.calc_sale_return(
-        coin.total_supply, coin.reserve_balance, coin_amount
+        coin_total_supply, coin_reserve_balance, coin_amount
     )
-    burn_amount_wei = Web3.to_wei(burn_amount)
+    burn_amount_wei = Web3.to_wei(burn_amount, 'ether')
 
     try:
         coin_balance_record = Holder.objects.get(user=user.pk, coin=coin.pk)
