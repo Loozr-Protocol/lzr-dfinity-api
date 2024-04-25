@@ -14,42 +14,42 @@ type TransferResult =
  };
 type TransferError = 
  variant {
-   BadBurn: record {min_burn_amount: Balance;};
-   BadFee: record {expected_fee: Balance;};
+   BadBurn: record {min_burn_amount: Balance__1;};
+   BadFee: record {expected_fee: Balance__1;};
    CreatedInFuture: record {ledger_time: Timestamp;};
    Duplicate: record {duplicate_of: TxIndex;};
    GenericError: record {
                    error_code: nat;
                    message: text;
                  };
-   InsufficientFunds: record {balance: Balance;};
+   InsufficientFunds: record {balance: Balance__1;};
    TemporarilyUnavailable;
    TooOld;
  };
 type TransferArgs = 
  record {
-   amount: Balance;
+   amount: Balance__1;
    created_at_time: opt nat64;
-   fee: opt Balance;
+   fee: opt Balance__1;
    from_subaccount: opt Subaccount;
    memo: opt blob;
-   to: Account;
+   to: Account__1;
  };
 type Transfer = 
  record {
-   amount: Balance;
+   amount: Balance__1;
    created_at_time: opt nat64;
-   fee: opt Balance;
-   from: Account;
+   fee: opt Balance__1;
+   from: Account__1;
    memo: opt blob;
-   to: Account;
+   to: Account__1;
  };
 type Transaction__1 = 
  record {
    burn: opt Burn;
    index: TxIndex;
    kind: text;
-   mint: opt Mint__1;
+   mint: opt Mint;
    timestamp: Timestamp;
    transfer: opt Transfer;
  };
@@ -59,7 +59,7 @@ type Transaction =
    burn: opt Burn;
    index: TxIndex;
    kind: text;
-   mint: opt Mint__1;
+   mint: opt Mint;
    timestamp: Timestamp;
    transfer: opt Transfer;
  };
@@ -70,17 +70,17 @@ type Token =
    get_transaction: (TxIndex__1) -> (opt Transaction__1);
    get_transactions: (GetTransactionsRequest) ->
     (GetTransactionsResponse) query;
-   icrc1_balance_of: (Account__1) -> (Balance__1) query;
+   icrc1_balance_of: (Account) -> (Balance) query;
    icrc1_decimals: () -> (nat8) query;
-   icrc1_fee: () -> (Balance__1) query;
+   icrc1_fee: () -> (Balance) query;
    icrc1_metadata: () -> (vec MetaDatum) query;
-   icrc1_minting_account: () -> (opt Account__1) query;
+   icrc1_minting_account: () -> (opt Account) query;
    icrc1_name: () -> (text) query;
    icrc1_supported_standards: () -> (vec SupportedStandard) query;
    icrc1_symbol: () -> (text) query;
-   icrc1_total_supply: () -> (Balance__1) query;
+   icrc1_total_supply: () -> (Balance) query;
    icrc1_transfer: (TransferArgs) -> (TransferResult);
-   mint: (Mint) -> (TransferResult);
+   mint: (principal, Balance) -> (TransferResult);
  };
 type Timestamp = nat64;
 type SupportedStandard = 
@@ -91,19 +91,12 @@ type SupportedStandard =
 type Subaccount = blob;
 type QueryArchiveFn = func (GetTransactionsRequest__1) ->
                        (TransactionRange) query;
-type Mint__1 = 
- record {
-   amount: Balance;
-   created_at_time: opt nat64;
-   memo: opt blob;
-   to: Account;
- };
 type Mint = 
  record {
-   amount: Balance;
+   amount: Balance__1;
    created_at_time: opt nat64;
    memo: opt blob;
-   to: Account;
+   to: Account__1;
  };
 type MetaDatum = 
  record {
@@ -129,16 +122,16 @@ type GetTransactionsRequest =
  };
 type BurnArgs = 
  record {
-   amount: Balance;
+   amount: Balance__1;
    created_at_time: opt nat64;
    from_subaccount: opt Subaccount;
    memo: opt blob;
  };
 type Burn = 
  record {
-   amount: Balance;
+   amount: Balance__1;
    created_at_time: opt nat64;
-   from: Account;
+   from: Account__1;
    memo: opt blob;
  };
 type Balance__1 = nat;
@@ -159,4 +152,4 @@ type Account =
    owner: principal;
    subaccount: opt Subaccount;
  };
-service : (text, text) -> Token
+service : (text, text, Account) -> Token

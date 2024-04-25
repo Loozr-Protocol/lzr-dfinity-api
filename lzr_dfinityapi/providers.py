@@ -4,6 +4,8 @@ from typing import Type
 from ic.agent import Agent
 from ic.identity import Identity
 from ic.canister import Canister
+from ic.candid import Types
+from ic.candid import encode
 
 from .config import CANDID_FOLDER
 
@@ -27,6 +29,7 @@ class BaseCanister(CanisterProvider):
     ):
         self.agent = Agent(identity=identity, client=client)
         super().__init__(self.agent)
+        self.canister_id = canister_id
         self.canister = self.get_canister(canister_id, candid_name)
 
 
@@ -91,8 +94,7 @@ class TokenCanister(BaseCanister):
     def icrc1_transfer(self, amount: int, principal: str):
         to = {"owner": principal, "subaccount": None}
         res = self.canister.icrc1_transfer(amount=amount, to=to)
-        print("Helloooo:::: ", res)
-        # return res[0]
+        return res[0]
 
     def icrc2_approve(self, amount: int, principal: str):
         spender = {"owner": principal, "subaccount": None}
@@ -110,36 +112,39 @@ class TokenCanister(BaseCanister):
 
 
 class CreatorTokenCanister(TokenCanister):
-    def __init__(self, identity: Identity, canister_id: str, creator_coin: str, client=None):
-        super().__init__(identity, canister_id, client, creator_coin)\
-        
-    def mint(self, amount: int, principal: str):
-        account = {"owner": principal, "subaccount": None}
-        res = self.canister.icrc1_transfer(amount=amount, account=account)
-        print("Helloooo:::: ", res)
-        # return res[0]
-    
-    def burn(self, amount: int):
-        res = self.canister.icrc1_transfer(amount=amount)
-        print("Helloooo:::: ", res)
-        # return res[0]
-
-
-class FactoryCanister(BaseCanister):
     def __init__(
-        self,
-        identity: Identity,
-        canister_id: str,
-        client=None,
-        candid_name="factory_backend",
+        self, identity: Identity, canister_id: str, creator_coin: str, client=None
     ):
-        super().__init__(
-            identity=identity,
-            candid_name=candid_name,
-            canister_id=canister_id,
-            client=client,
-        )
+        super().__init__(identity, canister_id, client, creator_coin)
 
-    def new_token(self, name: str, symbol: str):
-        res = self.canister.new_token(name, symbol)
-        return res
+    def mint(self, amount: int, principal: str):
+        params = [
+            {'type': Types.Principal, 'value': principal},
+            {'type': Types.Nat, 'value': amount}
+        ]
+
+        method_name = "mint"
+        res = self.agent.update_raw(self.canister_id, method_name, encode(params))
+        return res[0]
+
+    def burn(self, amount: int):
+        types = Types.Record(
+            {
+                "amount": Types.Nat,
+                "created_at_time": Types.Null,
+                "from_subaccount": Types.Null,
+                "meme": Types.Null,
+            }
+        )
+        vals = {
+            "amount": amount,
+            "created_at_time": None,
+            "from_subaccount": None,
+            "meme": None,
+        }
+        params = [{"type": types, "value": vals}]
+
+        method_name = "burn"
+        res = self.agent.update_raw(self.canister_id, method_name, encode(params))
+
+        return res[0]

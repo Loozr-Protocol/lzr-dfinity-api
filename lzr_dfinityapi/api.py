@@ -38,9 +38,7 @@ class ContinuosToken:
         return term3 - x
 
     @classmethod
-    def _calc_polynomial_target_amount(
-        cls, x: Union[int, float], p: Union[int, float]
-    ):
+    def _calc_polynomial_target_amount(cls, x: Union[int, float], p: Union[int, float]):
         """
         This is the formula: `(((((3*p)/m) + (x^3)) ^ r) - x)`
 
@@ -99,90 +97,119 @@ def create_coin(user, symbol: str, name: str) -> Coin:
         agent = Agent(identity=oracle_id, client=client)
 
         params = [
-            {'type': Types.Text, 'value': name},
-            {'type': Types.Text, 'value': symbol}
+            {"type": Types.Text, "value": name},
+            {"type": Types.Text, "value": symbol},
         ]
         result = agent.update_raw(factory_canister_id, "new_token", encode(params))
 
-        coin.canister_id = result[0]['value']
+        coin.canister_id = result[0]["value"]
         coin.save()
 
         return coin
 
 
 def buy_coin(user, coin: Coin, lzr_amount: Union[int, float]):
-    coin_reserve_balance = Web3.from_wei(coin.reserve_balance, 'ether')
-    coin_total_supply = Web3.from_wei(coin.total_supply, 'ether')
+    with transaction.atomic():
+        coin_reserve_balance = float(Web3.from_wei(coin.reserve_balance, "ether"))
+        coin_total_supply = float(Web3.from_wei(coin.total_supply, "ether"))
 
-    mint_amount = ContinuosToken.calc_purchase_return(
-        coin_total_supply, coin_reserve_balance, lzr_amount
-    )
-    client = Client(url=RPC_URL)
-    canister_id = coin.canister_id
-    oracle_id = Identity(privkey=ORACLE_IDENTITY)
-    coin_canister = CreatorTokenCanister(
-        identity=oracle_id, client=client, canister_id=canister_id
-    )
+        mint_amount = ContinuosToken.calc_purchase_return(
+            coin_total_supply, coin_reserve_balance, lzr_amount
+        )
 
-    mint_amount_wei = Web3.to_wei(mint_amount, 'ether')
-    user_principal = user.account_principal
+        mint_amount_wei = Web3.to_wei(mint_amount, "ether")
+        user_principal = user.account_principal
 
-    coin_canister.mint(mint_amount_wei, user_principal)
+        Log.objects.create(
+            user=user, coin=coin, amount=int(mint_amount_wei), tx_type=BOUGHT
+        )
+        try:
+            coin_balance_record = Holder.objects.get(user=user.pk, coin=coin.pk)
+        except Holder.DoesNotExist:
+            coin_balance_record = Holder.objects.create(user=user, coin=coin)
 
-    Log.objects.create(user=user, coin=coin, amount=int(mint_amount_wei), tx_type=BOUGHT)
-    try:
-        coin_balance_record = Holder.objects.get(user=user.pk, coin=coin.pk)
-    except Holder.DoesNotExist:
-        coin_balance_record = Holder.object.create(user=user, coin=coin)
+        coin_balance_record.balance = F("balance") + int(mint_amount_wei)
+        coin_balance_record.save()
 
-    coin_balance_record.balance = F("balance") + int(mint_amount_wei)
-    coin_balance_record.save()
+        coin.reserve_balance = F("reserve_balance") + int(Web3.to_wei(lzr_amount, "ether"))
+        coin.total_supply = F("total_supply") + int(Web3.to_wei(mint_amount, "ether"))
+        coin.holders.add(coin_balance_record)
 
-    coin_balance_record.refresh_from_db()
+        coin.save()
+
+        coin_balance_record.refresh_from_db()
+
+        client = Client(url=RPC_URL)
+        canister_id = coin.canister_id
+        oracle_id = Identity(privkey=ORACLE_IDENTITY)
+        coin_canister = CreatorTokenCanister(
+            identity=oracle_id,
+            client=client,
+            canister_id=canister_id,
+            creator_coin="lzr_founder_coin_backend",
+        )
+
+        coin_canister.mint(mint_amount_wei, user_principal)
 
 
-def sell_coin(user, user_identity: Identity, coin: Coin, coin_amount: Union[int, float]) -> Wei:
-    coin_reserve_balance = Web3.from_wei(coin.reserve_balance, 'ether')
-    coin_total_supply = Web3.from_wei(coin.total_supply, 'ether')
+def sell_coin(
+    user, user_identity: Identity, coin: Coin, coin_amount: Union[int, float]
+) -> Wei:
+    with transaction.atomic():
+        coin_reserve_balance = float(Web3.from_wei(coin.reserve_balance, "ether"))
+        coin_total_supply = float(Web3.from_wei(coin.total_supply, "ether"))
 
-    burn_amount = ContinuosToken.calc_sale_return(
-        coin_total_supply, coin_reserve_balance, coin_amount
-    )
-    burn_amount_wei = Web3.to_wei(burn_amount, 'ether')
+        burn_amount = ContinuosToken.calc_sale_return(
+            coin_total_supply, coin_reserve_balance, coin_amount
+        )
+        burn_amount_wei = Web3.to_wei(burn_amount, "ether")
 
-    try:
-        coin_balance_record = Holder.objects.get(user=user.pk, coin=coin.pk)
-    except Holder.DoesNotExist:
-        raise ValueError("You do not have any token to sell")
-    
-    if coin_balance_record.balance < int(burn_amount_wei):
-        raise ValueError("You do not have enough token to sell")
+        try:
+            coin_balance_record = Holder.objects.get(user=user.pk, coin=coin.pk)
+        except Holder.DoesNotExist:
+            raise ValueError("You do not have any token to sell")
 
-    client = Client(url=RPC_URL)
-    canister_id = coin.canister_id
-    coin_canister = CreatorTokenCanister(
-        identity=user_identity, client=client, canister_id=canister_id
-    )
+        if coin_balance_record.balance < int(burn_amount_wei):
+            raise ValueError("You do not have enough token to sell")
+        
+        Log.objects.create(
+            user=user,
+            coin=coin,
+            amount=int(Web3.to_wei(coin_amount, "ether")),
+            tx_type=SOLD,
+        )
 
-    coin_canister.burn(burn_amount_wei)
+        coin_balance_record.balance = F("balance") - int(Web3.to_wei(coin_amount, "ether"))
+        coin_balance_record.save()
 
-    Log.objects.create(user=user, coin=coin, amount=int(burn_amount_wei), tx_type=SOLD)
-    
-    coin_balance_record.balance = F("balance") - int(burn_amount_wei)
-    coin_balance_record.save()
+        coin.reserve_balance = F("reserve_balance") - int(Web3.to_wei(burn_amount, "ether"))
+        coin.total_supply = F("total_supply") - int(Web3.to_wei(coin_amount, "ether"))
 
-    coin_balance_record.refresh_from_db()
+        coin.save()
 
-    return burn_amount_wei
+        coin_balance_record.refresh_from_db()
+
+        client = Client(url=RPC_URL)
+        canister_id = coin.canister_id
+        coin_canister = CreatorTokenCanister(
+            identity=user_identity,
+            client=client,
+            canister_id=canister_id,
+            creator_coin="lzr_founder_coin_backend",
+        )
+
+        coin_canister.burn(burn_amount_wei)
+
+        return burn_amount_wei
 
 
 def get_holders(coin_id: int):
-    return Holder.objects.filter(coin=coin_id)
+    return Holder.objects.filter(coin=coin_id, balance__gt=0)
 
 
 def get_holder_record(coin_id: int, user_id: int):
-    return Holder.objects.get(coin=coin_id, user=user_id)
+    return Holder.objects.get(coin=coin_id, user=user_id, balance__gt=0)
 
 
 def get_user_holdings(user_id):
-    return Holder.objects.filter(user=user_id)
+    return Holder.objects.filter(user=user_id, balance__gt=0)

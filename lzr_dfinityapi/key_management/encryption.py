@@ -60,7 +60,6 @@ def encrypt_private_key_as_string(private_key):
 
 def decrypt_from_cipher_string(key_string):
     try:
-        key_string = key_string.decode("utf-8")
         encryption_key, encrypted_private_key = key_string.split("::")
     except ValueError:
         return None
